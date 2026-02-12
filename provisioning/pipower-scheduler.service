@@ -1,0 +1,27 @@
+[Unit]
+Description=PiPower Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/pipower
+ExecStart=/bin/bash -c 'while true; do /usr/bin/php artisan schedule:run --verbose --no-interaction; sleep 60; done'
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment=APP_ENV=production
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/pipower/storage /var/www/pipower/database
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

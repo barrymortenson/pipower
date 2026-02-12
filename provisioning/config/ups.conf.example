@@ -1,0 +1,68 @@
+# NUT UPS Configuration Examples
+# Copy the relevant section to /etc/nut/ups.conf
+# Documentation: https://networkupstools.org/docs/man/ups.conf.html
+
+# =============================================================================
+# USB HID UPS (Most common - CyberPower, APC, Eaton, etc.)
+# =============================================================================
+[ups]
+    driver = usbhid-ups
+    port = auto
+    desc = "Main UPS"
+    # Uncomment for specific vendor/product if auto-detection fails:
+    # vendorid = 0764
+    # productid = 0501
+
+# =============================================================================
+# APC Smart-UPS (Serial)
+# =============================================================================
+# [ups]
+#     driver = apcsmart
+#     port = /dev/ttyS0
+#     desc = "APC Smart-UPS"
+
+# =============================================================================
+# APC Back-UPS (USB)
+# =============================================================================
+# [ups]
+#     driver = usbhid-ups
+#     port = auto
+#     desc = "APC Back-UPS"
+#     vendorid = 051d
+
+# =============================================================================
+# CyberPower (USB)
+# =============================================================================
+# [ups]
+#     driver = usbhid-ups
+#     port = auto
+#     desc = "CyberPower UPS"
+#     vendorid = 0764
+
+# =============================================================================
+# Eaton/MGE (USB)
+# =============================================================================
+# [ups]
+#     driver = usbhid-ups
+#     port = auto
+#     desc = "Eaton UPS"
+#     vendorid = 0463
+
+# =============================================================================
+# Tripp Lite (USB)
+# =============================================================================
+# [ups]
+#     driver = usbhid-ups
+#     port = auto
+#     desc = "Tripp Lite UPS"
+#     vendorid = 09ae
+
+# =============================================================================
+# Network UPS (SNMP)
+# =============================================================================
+# [ups]
+#     driver = snmp-ups
+#     port = 192.168.1.100
+#     desc = "Network UPS"
+#     mibs = auto
+#     community = public
