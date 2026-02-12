@@ -94,6 +94,7 @@ sudo -u www-data composer install --no-dev --optimize-autoloader
 echo "Setting up database..."
 sudo -u www-data touch "$INSTALL_DIR/database/database.sqlite"
 sudo -u www-data php "$INSTALL_DIR/artisan" migrate --force
+sudo -u www-data php "$INSTALL_DIR/artisan" db:seed --force
 
 # Create psysh config directory for tinker
 mkdir -p /var/www/.config/psysh
