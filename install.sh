@@ -90,6 +90,38 @@ echo "Installing PHP dependencies..."
 cd "$INSTALL_DIR"
 sudo -u www-data composer install --no-dev --optimize-autoloader
 
+# Set up environment (before database seed so DEFAULT_RECIPIENTS is available)
+echo "Configuring environment..."
+if [ ! -f "$INSTALL_DIR/.env" ]; then
+    cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+    chown www-data:www-data "$INSTALL_DIR/.env"
+fi
+
+# Overlay .env values from SD card boot partition (written by power-setup:sd-card)
+if [ -f /boot/firmware/pipower.env ]; then
+    echo "Applying notification settings from SD card..."
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        if grep -q "^${key}=" "$INSTALL_DIR/.env"; then
+            sed -i "s|^${key}=.*|${key}=${value}|" "$INSTALL_DIR/.env"
+        else
+            echo "${key}=${value}" >> "$INSTALL_DIR/.env"
+        fi
+    done < /boot/firmware/pipower.env
+    rm -f /boot/firmware/pipower.env
+    echo "Notification settings applied and removed from boot partition."
+fi
+
+# Ensure APP_KEY is set
+if ! grep -q "^APP_KEY=base64:" "$INSTALL_DIR/.env"; then
+    sudo -u www-data php "$INSTALL_DIR/artisan" key:generate
+fi
+
+# Configure for production
+sed -i 's/APP_ENV=local/APP_ENV=production/' "$INSTALL_DIR/.env"
+sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' "$INSTALL_DIR/.env"
+sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=file/' "$INSTALL_DIR/.env"
+
 # Create database
 echo "Setting up database..."
 sudo -u www-data touch "$INSTALL_DIR/database/database.sqlite"
@@ -113,25 +145,6 @@ if [ -f "$INSTALL_DIR/package.json" ]; then
     rm -rf node_modules
     chown -R www-data:www-data "$INSTALL_DIR/public/build"
 fi
-
-# Set up environment
-echo "Configuring environment..."
-if [ ! -f "$INSTALL_DIR/.env" ]; then
-    cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-    chown www-data:www-data "$INSTALL_DIR/.env"
-fi
-
-# Ensure APP_KEY is set
-if ! grep -q "^APP_KEY=base64:" "$INSTALL_DIR/.env"; then
-    sudo -u www-data php "$INSTALL_DIR/artisan" key:generate
-fi
-
-# Configure for production
-sed -i 's/APP_ENV=local/APP_ENV=production/' "$INSTALL_DIR/.env"
-sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' "$INSTALL_DIR/.env"
-sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=file/' "$INSTALL_DIR/.env"
-# Note: Configure MAIL_PASSWORD, PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, and
-# PLIVO_FROM_NUMBER in .env after installation for email/SMS notifications
 
 # Configure nginx
 echo "Configuring nginx..."
