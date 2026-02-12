@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
 use function Laravel\Prompts\text;
 use function Laravel\Prompts\warning;
 
@@ -50,6 +51,7 @@ class SetupSdCommand extends Command
 
         $success = $this->configureCmdline($bootfsPath, $config) && $success;
         $success = $this->createFirstRunScript($bootfsPath, $config) && $success;
+        $this->writeEnvToBootPartition($bootfsPath);
 
         if ($success) {
             info('');
@@ -143,6 +145,17 @@ class SetupSdCommand extends Command
         info('DNS servers:   '.implode(', ', $config['dns']));
         info('');
         info("Boot partition: {$bootfsPath}");
+
+        $envValues = $this->getEnvKeysToExport();
+        if (! empty($envValues)) {
+            info('');
+            info('Notification settings to copy:');
+            foreach ($envValues as $key => $value) {
+                $display = $this->shouldMask($key) ? $this->maskValue($value) : $value;
+                note("  {$key}={$display}");
+            }
+        }
+
         info('');
     }
 
@@ -270,5 +283,74 @@ BASH;
         $base = ip2long('255.255.255.255');
 
         return 32 - (int) log(($long ^ $base) + 1, 2);
+    }
+
+    private const ENV_KEYS = [
+        'MAIL_MAILER',
+        'MAIL_HOST',
+        'MAIL_PORT',
+        'MAIL_USERNAME',
+        'MAIL_PASSWORD',
+        'MAIL_ENCRYPTION',
+        'MAIL_FROM_ADDRESS',
+        'MAIL_FROM_NAME',
+        'PLIVO_AUTH_ID',
+        'PLIVO_AUTH_TOKEN',
+        'PLIVO_FROM_NUMBER',
+        'DEFAULT_RECIPIENTS',
+    ];
+
+    private const MASKED_KEYS = [
+        'MAIL_PASSWORD',
+        'PLIVO_AUTH_ID',
+        'PLIVO_AUTH_TOKEN',
+    ];
+
+    private function getEnvKeysToExport(): array
+    {
+        $values = [];
+
+        foreach (self::ENV_KEYS as $key) {
+            $value = env($key);
+            if ($value !== null && $value !== '') {
+                $values[$key] = (string) $value;
+            }
+        }
+
+        return $values;
+    }
+
+    private function shouldMask(string $key): bool
+    {
+        return in_array($key, self::MASKED_KEYS, true);
+    }
+
+    private function maskValue(string $value): string
+    {
+        if (strlen($value) <= 4) {
+            return str_repeat('*', strlen($value));
+        }
+
+        return substr($value, 0, 2).str_repeat('*', strlen($value) - 4).substr($value, -2);
+    }
+
+    private function writeEnvToBootPartition(string $bootfsPath): void
+    {
+        $envValues = $this->getEnvKeysToExport();
+
+        if (empty($envValues)) {
+            info('No notification settings found in .env — skipping pipower.env');
+
+            return;
+        }
+
+        $lines = ['# PiPower notification settings (written by power-setup:sd-card)'];
+        foreach ($envValues as $key => $value) {
+            $lines[] = "{$key}={$value}";
+        }
+
+        $envPath = "{$bootfsPath}/pipower.env";
+        File::put($envPath, implode("\n", $lines)."\n");
+        info('Wrote notification settings to pipower.env on boot partition');
     }
 }
