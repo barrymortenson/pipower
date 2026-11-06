@@ -28,13 +28,13 @@
                 >
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 min-w-0">
-                            <span
-                                class="px-2 py-0.5 text-xs rounded-full shrink-0"
-                                :class="recipient.type === 'email' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'"
-                            >
-                                {{ recipient.type === 'email' ? 'Email' : 'SMS' }}
+                            <span v-if="recipient.email" class="px-2 py-0.5 text-xs rounded-full shrink-0 bg-blue-100 text-blue-800">
+                                Email
                             </span>
-                            <span class="font-medium truncate">{{ recipient.name || recipient.value }}</span>
+                            <span v-if="recipient.phone" class="px-2 py-0.5 text-xs rounded-full shrink-0 bg-purple-100 text-purple-800">
+                                SMS
+                            </span>
+                            <span class="font-medium truncate">{{ recipientLabel(recipient) }}</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button
@@ -58,8 +58,8 @@
                             </button>
                         </div>
                     </div>
-                    <div v-if="recipient.name" class="text-xs text-gray-500 mt-1 ml-14 truncate">
-                        {{ recipient.value }}
+                    <div v-if="recipientDetails(recipient)" class="text-xs text-gray-500 mt-1 truncate">
+                        {{ recipientDetails(recipient) }}
                     </div>
                 </li>
             </ul>
@@ -242,28 +242,30 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Type
+                            Email Address
                         </label>
-                        <select
-                            v-model="modal.type"
+                        <input
+                            v-model="modal.email"
+                            type="email"
+                            placeholder="user@example.com"
                             class="w-full border rounded-lg px-3 py-2"
-                        >
-                            <option value="email">Email</option>
-                            <option value="phone">SMS (Phone)</option>
-                        </select>
+                        />
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            {{ modal.type === 'email' ? 'Email Address' : 'Phone Number' }}
+                            Phone Number (SMS)
                         </label>
                         <input
-                            v-model="modal.value"
-                            :type="modal.type === 'email' ? 'email' : 'tel'"
-                            :placeholder="modal.type === 'email' ? 'user@example.com' : '+1234567890'"
+                            v-model="modal.phone"
+                            type="tel"
+                            placeholder="+15551234567"
                             class="w-full border rounded-lg px-3 py-2"
                         />
                     </div>
+                    <p class="text-xs text-gray-500 -mt-2">
+                        Fill in either one or both. Alerts go to every address you enter.
+                    </p>
 
                     <div class="flex items-center">
                         <input
@@ -323,18 +325,33 @@ async function fetchRecipients() {
     }
 }
 
+function recipientLabel(recipient) {
+    return recipient.name || recipient.email || recipient.phone;
+}
+
+// Contact details shown under the label, without repeating the label itself
+function recipientDetails(recipient) {
+    return [recipient.email, recipient.phone]
+        .filter(value => value && value !== recipientLabel(recipient))
+        .join(' · ');
+}
+
 function showAddModal() {
     modal.value = {
         name: '',
-        type: 'email',
-        value: '',
+        email: '',
+        phone: '',
         enabled: true,
     };
     error.value = null;
 }
 
 function showEditModal(recipient) {
-    modal.value = { ...recipient };
+    modal.value = {
+        ...recipient,
+        email: recipient.email ?? '',
+        phone: recipient.phone ?? '',
+    };
     error.value = null;
 }
 
@@ -344,8 +361,15 @@ function closeModal() {
 }
 
 async function saveRecipient() {
-    if (!modal.value.value) {
-        error.value = 'Value is required';
+    const payload = {
+        name: modal.value.name?.trim() || null,
+        email: modal.value.email?.trim() || null,
+        phone: modal.value.phone?.trim() || null,
+        enabled: modal.value.enabled,
+    };
+
+    if (!payload.email && !payload.phone) {
+        error.value = 'Enter an email address, a phone number, or both.';
         return;
     }
 
@@ -354,19 +378,9 @@ async function saveRecipient() {
 
     try {
         if (modal.value.id) {
-            await api.updateRecipient(modal.value.id, {
-                name: modal.value.name || null,
-                type: modal.value.type,
-                value: modal.value.value,
-                enabled: modal.value.enabled,
-            });
+            await api.updateRecipient(modal.value.id, payload);
         } else {
-            await api.createRecipient({
-                name: modal.value.name || null,
-                type: modal.value.type,
-                value: modal.value.value,
-                enabled: modal.value.enabled,
-            });
+            await api.createRecipient(payload);
         }
         closeModal();
         await fetchRecipients();
@@ -389,7 +403,7 @@ async function toggleEnabled(recipient) {
 }
 
 async function deleteRecipient(recipient) {
-    if (!confirm(`Delete ${recipient.value}?`)) {
+    if (!confirm(`Delete ${recipientLabel(recipient)}?`)) {
         return;
     }
 

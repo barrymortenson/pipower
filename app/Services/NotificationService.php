@@ -35,9 +35,9 @@ class NotificationService
 
         foreach ($recipients as $recipient) {
             try {
-                Mail::to($recipient->value)->send(new PowerEventMail($eventType, $subject, $message, $hostname));
+                Mail::to($recipient->email)->send(new PowerEventMail($eventType, $subject, $message, $hostname));
             } catch (\Exception $e) {
-                Log::error("Failed to send email to {$recipient->value}: {$e->getMessage()}");
+                Log::error("Failed to send email to {$recipient->email}: {$e->getMessage()}");
             }
         }
     }
@@ -57,10 +57,10 @@ class NotificationService
         $smsText = "{$hostname}: {$subject} - {$message}";
 
         foreach ($recipients as $recipient) {
-            $result = $this->sendSms($plivo, $recipient->value, $smsText);
+            $result = $this->sendSms($plivo, $recipient->phone, $smsText);
 
             if (! $result['success']) {
-                Log::error("Failed to send SMS to {$recipient->value}: {$result['error']}");
+                Log::error("Failed to send SMS to {$recipient->phone}: {$result['error']}");
             }
         }
     }
@@ -74,15 +74,15 @@ class NotificationService
         $this->settings->applyMailConfig();
         foreach ($emailRecipients as $recipient) {
             try {
-                Mail::to($recipient->value)->send(new PowerEventMail(
+                Mail::to($recipient->email)->send(new PowerEventMail(
                     'test',
                     'Test Notification',
                     'This is a test notification to verify your alert settings are working correctly.',
                     $hostname
                 ));
-                $results['email'][] = ['recipient' => $recipient->value, 'success' => true];
+                $results['email'][] = ['recipient' => $recipient->email, 'success' => true];
             } catch (\Exception $e) {
-                $results['email'][] = ['recipient' => $recipient->value, 'success' => false, 'error' => $e->getMessage()];
+                $results['email'][] = ['recipient' => $recipient->email, 'success' => false, 'error' => $e->getMessage()];
             }
         }
 
@@ -93,9 +93,9 @@ class NotificationService
         foreach ($phoneRecipients as $recipient) {
             $result = $plivo === null
                 ? ['success' => false, 'error' => 'Plivo is not configured (Auth ID, Auth Token and From Number are all required)']
-                : $this->sendSms($plivo, $recipient->value, $smsText);
+                : $this->sendSms($plivo, $recipient->phone, $smsText);
 
-            $results['sms'][] = ['recipient' => $recipient->value, ...$result];
+            $results['sms'][] = ['recipient' => $recipient->phone, ...$result];
         }
 
         return $results;
