@@ -17,7 +17,16 @@ async function request(endpoint, options = {}) {
     });
 
     if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        let message = `API error: ${response.status}`;
+        try {
+            const body = await response.json();
+            if (body?.message) {
+                message = body.message;
+            }
+        } catch {
+            // Non-JSON error body; keep the status message
+        }
+        throw new Error(message);
     }
 
     if (response.status === 204) {
@@ -51,6 +60,13 @@ export const api = {
 
     // Notifications
     sendTestNotification: () => request('/notifications/test', { method: 'POST' }),
+
+    // Notification delivery settings (SMTP, Plivo)
+    getNotificationSettings: () => request('/settings/notifications'),
+    updateNotificationSettings: (data) => request('/settings/notifications', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    }),
 
     // Settings
     getSettings: () => request('/settings'),

@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
+    private NotificationSettingsService $settings;
+
+    public function __construct(?NotificationSettingsService $settings = null)
+    {
+        $this->settings = $settings ?? new NotificationSettingsService;
+    }
+
     public function notify(string $eventType, string $message): void
     {
         $subject = $this->getSubjectForEvent($eventType);
@@ -22,6 +29,8 @@ class NotificationService
     public function sendEmailNotifications(string $eventType, string $subject, string $message, string $hostname): void
     {
         $recipients = Recipient::enabled()->emails()->get();
+
+        $this->settings->applyMailConfig();
 
         foreach ($recipients as $recipient) {
             try {
@@ -36,9 +45,7 @@ class NotificationService
     {
         $recipients = Recipient::enabled()->phones()->get();
 
-        $authId = config('pipower.plivo.auth_id');
-        $authToken = config('pipower.plivo.auth_token');
-        $fromNumber = config('pipower.plivo.from_number');
+        ['auth_id' => $authId, 'auth_token' => $authToken, 'from_number' => $fromNumber] = $this->settings->plivo();
 
         if (empty($authId) || empty($authToken) || empty($fromNumber)) {
             Log::warning('Plivo credentials not configured, skipping SMS');
@@ -68,6 +75,7 @@ class NotificationService
         $hostname = $this->getHostname();
 
         $emailRecipients = Recipient::enabled()->emails()->get();
+        $this->settings->applyMailConfig();
         foreach ($emailRecipients as $recipient) {
             try {
                 Mail::to($recipient->value)->send(new PowerEventMail(
