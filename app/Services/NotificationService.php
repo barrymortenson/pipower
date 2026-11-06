@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\PowerEventMail;
 use App\Models\Recipient;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -45,9 +46,9 @@ class NotificationService
     {
         $recipients = Recipient::enabled()->phones()->get();
 
-        ['auth_id' => $authId, 'auth_token' => $authToken, 'from_number' => $fromNumber] = $this->settings->plivo();
+        $plivo = $this->plivoCredentials();
 
-        if (empty($authId) || empty($authToken) || empty($fromNumber)) {
+        if ($plivo === null) {
             Log::warning('Plivo credentials not configured, skipping SMS');
 
             return;
@@ -56,15 +57,10 @@ class NotificationService
         $smsText = "{$hostname}: {$subject} - {$message}";
 
         foreach ($recipients as $recipient) {
-            try {
-                Http::withBasicAuth($authId, $authToken)
-                    ->post("https://api.plivo.com/v1/Account/{$authId}/Message/", [
-                        'src' => $fromNumber,
-                        'dst' => $recipient->value,
-                        'text' => $smsText,
-                    ]);
-            } catch (\Exception $e) {
-                Log::error("Failed to send SMS to {$recipient->value}: {$e->getMessage()}");
+            $result = $this->sendSms($plivo, $recipient->value, $smsText);
+
+            if (! $result['success']) {
+                Log::error("Failed to send SMS to {$recipient->value}: {$result['error']}");
             }
         }
     }
@@ -91,16 +87,79 @@ class NotificationService
         }
 
         $phoneRecipients = Recipient::enabled()->phones()->get();
+        $plivo = $this->plivoCredentials();
+        $smsText = "{$hostname}: Test - This is a test notification.";
+
         foreach ($phoneRecipients as $recipient) {
-            try {
-                $this->sendSmsNotifications($hostname, 'Test', 'This is a test notification.');
-                $results['sms'][] = ['recipient' => $recipient->value, 'success' => true];
-            } catch (\Exception $e) {
-                $results['sms'][] = ['recipient' => $recipient->value, 'success' => false, 'error' => $e->getMessage()];
-            }
+            $result = $plivo === null
+                ? ['success' => false, 'error' => 'Plivo is not configured (Auth ID, Auth Token and From Number are all required)']
+                : $this->sendSms($plivo, $recipient->value, $smsText);
+
+            $results['sms'][] = ['recipient' => $recipient->value, ...$result];
         }
 
         return $results;
+    }
+
+    /**
+     * Plivo credentials in effect, or null when any of them is missing.
+     *
+     * @return array{auth_id: string, auth_token: string, from_number: string}|null
+     */
+    private function plivoCredentials(): ?array
+    {
+        $plivo = $this->settings->plivo();
+
+        if (empty($plivo['auth_id']) || empty($plivo['auth_token']) || empty($plivo['from_number'])) {
+            return null;
+        }
+
+        return $plivo;
+    }
+
+    /**
+     * Send one SMS through Plivo. A request Plivo rejects (bad credentials,
+     * invalid number, no balance) counts as a failure, not just exceptions.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    private function sendSms(array $plivo, string $to, string $text): array
+    {
+        try {
+            $response = Http::withBasicAuth($plivo['auth_id'], $plivo['auth_token'])
+                ->post("https://api.plivo.com/v1/Account/{$plivo['auth_id']}/Message/", [
+                    'src' => $plivo['from_number'],
+                    'dst' => $to,
+                    'text' => $text,
+                ]);
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+
+        if ($response->successful()) {
+            return ['success' => true];
+        }
+
+        return ['success' => false, 'error' => $this->plivoError($response)];
+    }
+
+    private function plivoError(Response $response): string
+    {
+        $status = $response->status();
+
+        if ($status === 401) {
+            return 'Plivo rejected the Auth ID or Auth Token (HTTP 401)';
+        }
+
+        $error = $response->json('error');
+
+        if (is_array($error)) {
+            $error = json_encode($error);
+        }
+
+        return is_string($error) && $error !== ''
+            ? "Plivo error (HTTP {$status}): {$error}"
+            : "Plivo returned HTTP {$status}";
     }
 
     private function getSubjectForEvent(string $eventType): string

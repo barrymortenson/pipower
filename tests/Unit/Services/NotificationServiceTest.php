@@ -327,3 +327,89 @@ it('sends to multiple phone recipients', function () {
 
     Http::assertSentCount(2);
 });
+
+// --- SMS result reporting ---
+
+function configurePlivo(): void
+{
+    config([
+        'pipower.plivo.auth_id' => 'test_auth_id',
+        'pipower.plivo.auth_token' => 'test_auth_token',
+        'pipower.plivo.from_number' => '+15550000000',
+    ]);
+}
+
+it('sendTestNotification reports sms success when plivo accepts the message', function () {
+    Http::fake(['api.plivo.com/*' => Http::response(['message' => 'message(s) queued'], 202)]);
+    configurePlivo();
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+
+    $results = (new NotificationService)->sendTestNotification();
+
+    expect($results['sms'])->toBe([['recipient' => '+15551234567', 'success' => true]]);
+});
+
+it('sendTestNotification reports sms failure when plivo rejects the credentials', function () {
+    Http::fake(['api.plivo.com/*' => Http::response('Could not verify your access level for that URL.', 401)]);
+    configurePlivo();
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+
+    $results = (new NotificationService)->sendTestNotification();
+
+    expect($results['sms'][0]['success'])->toBeFalse()
+        ->and($results['sms'][0]['error'])->toContain('Auth ID or Auth Token');
+});
+
+it('sendTestNotification includes the plivo error message', function () {
+    Http::fake(['api.plivo.com/*' => Http::response(['api_id' => 'x', 'error' => 'insufficient credit'], 400)]);
+    configurePlivo();
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+
+    $results = (new NotificationService)->sendTestNotification();
+
+    expect($results['sms'][0]['success'])->toBeFalse()
+        ->and($results['sms'][0]['error'])->toBe('Plivo error (HTTP 400): insufficient credit');
+});
+
+it('sendTestNotification reports sms failure when plivo is not configured', function () {
+    Http::fake();
+    config(['pipower.plivo.auth_id' => '', 'pipower.plivo.auth_token' => '', 'pipower.plivo.from_number' => '']);
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+
+    $results = (new NotificationService)->sendTestNotification();
+
+    expect($results['sms'][0]['success'])->toBeFalse()
+        ->and($results['sms'][0]['error'])->toContain('not configured');
+    Http::assertNothingSent();
+});
+
+it('sendTestNotification sends exactly one sms per phone recipient', function () {
+    Http::fake(['api.plivo.com/*' => Http::response([], 202)]);
+    configurePlivo();
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+    Recipient::create(['type' => 'phone', 'value' => '+15559876543', 'enabled' => true]);
+    Recipient::create(['type' => 'phone', 'value' => '+15550001111', 'enabled' => true]);
+
+    $results = (new NotificationService)->sendTestNotification();
+
+    expect($results['sms'])->toHaveCount(3);
+    Http::assertSentCount(3);
+    Http::assertSent(fn ($request) => $request['dst'] === '+15559876543');
+});
+
+it('logs an error when plivo rejects an sms during notify', function () {
+    Log::spy();
+    Http::fake(['api.plivo.com/*' => Http::response(['error' => 'invalid dst'], 400)]);
+    configurePlivo();
+
+    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+
+    (new NotificationService)->sendSmsNotifications('test-host', 'Test', 'Test message');
+
+    Log::shouldHaveReceived('error')->with(Mockery::pattern('/Failed to send SMS to \+15551234567: Plivo error \(HTTP 400\): invalid dst/'));
+});

@@ -203,7 +203,13 @@
                 </button>
             </div>
             <div v-if="testResult" class="mt-4 p-3 rounded" :class="testResultClass">
-                {{ testResult }}
+                <p>{{ testResult }}</p>
+                <ul v-if="testFailures.length" class="mt-2 space-y-1 text-sm">
+                    <li v-for="failure in testFailures" :key="failure.type + failure.recipient">
+                        <span class="font-medium">{{ failure.type }} {{ failure.recipient }}:</span>
+                        {{ failure.error || 'Unknown error' }}
+                    </li>
+                </ul>
             </div>
         </div>
 
@@ -304,6 +310,7 @@ const error = ref(null);
 const sendingTest = ref(false);
 const testResult = ref(null);
 const testResultSuccess = ref(false);
+const testFailures = ref([]);
 
 async function fetchRecipients() {
     loading.value = true;
@@ -403,19 +410,26 @@ const testResultClass = computed(() => {
 async function sendTest() {
     sendingTest.value = true;
     testResult.value = null;
+    testFailures.value = [];
 
     try {
         const results = await api.sendTestNotification();
-        const emailCount = results.email?.filter(r => r.success).length || 0;
-        const smsCount = results.sms?.filter(r => r.success).length || 0;
-        const totalSent = emailCount + smsCount;
+        const all = [
+            ...(results.email || []).map(r => ({ ...r, type: 'Email' })),
+            ...(results.sms || []).map(r => ({ ...r, type: 'SMS' })),
+        ];
+        const sent = all.filter(r => r.success).length;
+        testFailures.value = all.filter(r => !r.success);
 
-        if (totalSent > 0) {
-            testResultSuccess.value = true;
-            testResult.value = `Test notification sent to ${totalSent} recipient(s)`;
-        } else {
+        if (all.length === 0) {
             testResultSuccess.value = false;
             testResult.value = 'No notifications sent. Check that you have enabled recipients.';
+        } else if (testFailures.value.length === 0) {
+            testResultSuccess.value = true;
+            testResult.value = `Test notification sent to ${sent} recipient(s)`;
+        } else {
+            testResultSuccess.value = false;
+            testResult.value = `Sent to ${sent} of ${all.length} recipient(s). Failed:`;
         }
     } catch (e) {
         testResultSuccess.value = false;
