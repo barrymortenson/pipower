@@ -37,8 +37,11 @@ class SetupSdCommand extends Command
         // Gather configuration
         $config = $this->gatherConfiguration();
 
+        // Ask separately whether to copy notification settings from the local .env
+        $envValues = $this->confirmEnvExport($bootfsPath);
+
         // Show summary
-        $this->showSummary($config, $bootfsPath);
+        $this->showSummary($config, $bootfsPath, $envValues);
 
         if (! confirm('Proceed with SD card configuration?', default: true)) {
             warning('Aborted.');
@@ -51,7 +54,7 @@ class SetupSdCommand extends Command
 
         $success = $this->configureCmdline($bootfsPath, $config) && $success;
         $success = $this->createFirstRunScript($bootfsPath, $config) && $success;
-        $this->writeEnvToBootPartition($bootfsPath);
+        $this->writeEnvToBootPartition($bootfsPath, $envValues);
 
         if ($success) {
             info('');
@@ -134,7 +137,7 @@ class SetupSdCommand extends Command
         ];
     }
 
-    private function showSummary(array $config, string $bootfsPath): void
+    private function showSummary(array $config, string $bootfsPath, array $envValues): void
     {
         info('');
         info('Configuration Summary');
@@ -145,18 +148,51 @@ class SetupSdCommand extends Command
         info('DNS servers:   '.implode(', ', $config['dns']));
         info('');
         info("Boot partition: {$bootfsPath}");
+        info('Notification settings: '.(empty($envValues)
+            ? 'not copied'
+            : 'copy '.count($envValues).' value(s) from local .env to pipower.env'));
 
+        info('');
+    }
+
+    /**
+     * Show exactly which notification settings would be copied from the
+     * local .env and ask before copying any of them. Defaults to "no" so
+     * personal credentials and contacts never land on a card by accident.
+     *
+     * @return array<string, string> The values to write (empty if declined)
+     */
+    private function confirmEnvExport(string $bootfsPath): array
+    {
         $envValues = $this->getEnvKeysToExport();
-        if (! empty($envValues)) {
-            info('');
-            info('Notification settings to copy:');
-            foreach ($envValues as $key => $value) {
-                $display = $this->shouldMask($key) ? $this->maskValue($value) : $value;
-                note("  {$key}={$display}");
-            }
+
+        if (empty($envValues)) {
+            return [];
         }
 
         info('');
+        info('Notification Settings From Your Local .env');
+        info('------------------------------------------');
+        info('Source: '.app()->environmentFilePath());
+        info('These values are set in your local .env:');
+        foreach ($envValues as $key => $value) {
+            $display = $this->shouldMask($key) ? $this->maskValue($value) : $value;
+            note("  {$key}={$display}");
+        }
+        info('');
+        warning("If copied, they are written in plain text to {$bootfsPath}/pipower.env.");
+        info("On first boot, install.sh moves them into the Pi's .env and deletes that file.");
+        info('Anyone who boots this card gets these credentials and recipients.');
+        info('Skip this if the device is for someone else. You can also enter');
+        info('these later on the Notifications page of the web UI.');
+
+        if (! confirm('Copy these notification settings to the SD card?', default: false)) {
+            info('Notification settings will NOT be copied.');
+
+            return [];
+        }
+
+        return $envValues;
     }
 
     private function configureCmdline(string $bootfsPath, array $config): bool
@@ -334,12 +370,16 @@ BASH;
         return substr($value, 0, 2).str_repeat('*', strlen($value) - 4).substr($value, -2);
     }
 
-    private function writeEnvToBootPartition(string $bootfsPath): void
+    private function writeEnvToBootPartition(string $bootfsPath, array $envValues): void
     {
-        $envValues = $this->getEnvKeysToExport();
+        $envPath = "{$bootfsPath}/pipower.env";
 
         if (empty($envValues)) {
-            info('No notification settings found in .env — skipping pipower.env');
+            // Remove a file left by an earlier run so install.sh doesn't import it.
+            if (File::exists($envPath)) {
+                File::delete($envPath);
+                info('Removed existing pipower.env from boot partition');
+            }
 
             return;
         }
@@ -349,7 +389,6 @@ BASH;
             $lines[] = "{$key}={$value}";
         }
 
-        $envPath = "{$bootfsPath}/pipower.env";
         File::put($envPath, implode("\n", $lines)."\n");
         info('Wrote notification settings to pipower.env on boot partition');
     }
