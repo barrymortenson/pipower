@@ -69,6 +69,24 @@ it('rejects an invalid email address', function () {
         ->assertJsonValidationErrors('email');
 });
 
+it('rejects a phone number that is not +1 and 10 digits', function (string $phone) {
+    $this->postJson('/api/recipients', ['phone' => $phone])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('phone');
+
+    expect(Recipient::count())->toBe(0);
+})->with(['8052053000', '+1805205300', '+1 805 205 3000', '+1805-205-3000', '+448052053000']);
+
+it('rejects an update to an invalid phone number', function () {
+    $recipient = Recipient::create(['phone' => '+15551234567', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['phone' => '555-123-4567'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('phone');
+
+    expect($recipient->fresh()->phone)->toBe('+15551234567');
+});
+
 it('updates a recipient', function () {
     $recipient = Recipient::create(['email' => 'old@example.com', 'enabled' => true]);
 
@@ -97,6 +115,28 @@ it('removes one channel from a recipient that has both', function () {
 
     expect($recipient->fresh()->email)->toBeNull()
         ->and($recipient->fresh()->phone)->toBe('+15551234567');
+});
+
+it('clears the phone from a recipient that has both', function () {
+    $recipient = Recipient::create(['email' => 'barry@example.com', 'phone' => '+15551234567', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['phone' => null])
+        ->assertStatus(200);
+
+    expect($recipient->fresh()->phone)->toBeNull()
+        ->and($recipient->fresh()->email)->toBe('barry@example.com');
+});
+
+it('updates a recipient whose phone was saved in an older format without changing it', function () {
+    $recipient = Recipient::create(['name' => 'Mom', 'phone' => '+44 7911 123456', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['name' => 'Mum', 'enabled' => false])
+        ->assertStatus(200);
+
+    expect($recipient->fresh())
+        ->name->toBe('Mum')
+        ->enabled->toBeFalse()
+        ->phone->toBe('+44 7911 123456');
 });
 
 it('refuses an update that leaves a recipient with no email or phone', function () {

@@ -156,3 +156,23 @@ it('validates input', function () {
         ->assertStatus(422)
         ->assertJsonValidationErrors(['smtp_port', 'smtp_from_address', 'plivo_from_number']);
 });
+
+it('rejects a plivo from number that is not +1 and 10 digits', function (string $number) {
+    $this->putJson('/api/settings/notifications', ['plivo_from_number' => $number])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('plivo_from_number');
+})->with(['8052053000', '+1805205300', '+1 805 205 3000', '+448052053000', '+10052053000']);
+
+it('accepts a plivo from number of +1 and 10 digits', function () {
+    $this->putJson('/api/settings/notifications', ['plivo_from_number' => '+18052053000'])
+        ->assertOk()
+        ->assertJsonPath('plivo_from_number', '+18052053000');
+});
+
+it('clears a saved plivo from number', function () {
+    $this->putJson('/api/settings/notifications', ['plivo_from_number' => '+18052053000'])->assertOk();
+
+    $this->putJson('/api/settings/notifications', ['plivo_from_number' => null])
+        ->assertOk()
+        ->assertJsonPath('plivo_from_number', null);
+});

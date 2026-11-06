@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Rules\UsPhoneNumber;
 use App\Services\NotificationSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class NotificationSettingsController extends Controller
             'plivo_auth_id' => 'sometimes|nullable|string|max:255',
             'plivo_auth_token' => 'sometimes|nullable|string|max:255',
             'clear_plivo_auth_token' => 'sometimes|boolean',
-            'plivo_from_number' => ['sometimes', 'nullable', 'string', 'regex:/^\+?[0-9]{6,15}$/'],
+            'plivo_from_number' => ['sometimes', 'nullable', 'string', new UsPhoneNumber],
         ]);
 
         $this->settings->update($validated);

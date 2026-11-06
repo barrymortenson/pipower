@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Recipient;
+use App\Rules\UsPhoneNumber;
 use Illuminate\Database\Seeder;
 
 class DefaultRecipientsSeeder extends Seeder
@@ -11,7 +12,8 @@ class DefaultRecipientsSeeder extends Seeder
      * Seed default notification recipients from .env configuration.
      *
      * Format: "Name <value>, Name <value>"
-     * Type is auto-detected: @ = email, anything else = phone.
+     * Type is auto-detected: @ = email, anything else = phone. Phone
+     * numbers must be US numbers; others are skipped with a warning.
      * Entries that share a name become one recipient with both an email
      * address and a phone number, e.g. "Barry <b@example.com>, Barry <+15551234567>".
      */
@@ -103,6 +105,20 @@ class DefaultRecipientsSeeder extends Seeder
             }
 
             $type = str_contains($value, '@') ? 'email' : 'phone';
+
+            if ($type === 'phone') {
+                // Store US numbers as +1XXXXXXXXXX. Anything else would fail
+                // validation the first time the recipient is edited, so skip it.
+                $number = UsPhoneNumber::normalize($value);
+
+                if ($number === null) {
+                    $this->command?->warn("Skipped default recipient \"{$entry}\": not a valid US phone number.");
+
+                    continue;
+                }
+
+                $value = $number;
+            }
 
             $contacts[] = [
                 'name' => $name,

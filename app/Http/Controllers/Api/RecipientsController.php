@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Recipient;
+use App\Rules\UsPhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -21,7 +22,7 @@ class RecipientsController extends Controller
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:32',
+            'phone' => ['nullable', 'string', new UsPhoneNumber],
             'enabled' => 'boolean',
         ]);
 
@@ -37,7 +38,7 @@ class RecipientsController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|nullable|string|max:255',
             'email' => 'sometimes|nullable|email|max:255',
-            'phone' => 'sometimes|nullable|string|max:32',
+            'phone' => ['sometimes', 'nullable', 'string', new UsPhoneNumber],
             'enabled' => 'sometimes|boolean',
         ]);
 

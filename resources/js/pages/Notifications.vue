@@ -175,8 +175,8 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">From Number</label>
-                    <input v-model="plivo.plivo_from_number" type="tel" placeholder="+15551234567" class="w-full border rounded-lg px-3 py-2" />
-                    <p class="text-xs text-gray-500 mt-1">A Plivo number on your account, in international format.</p>
+                    <UsPhoneInput v-model="plivo.plivo_from_number" />
+                    <p class="text-xs text-gray-500 mt-1">A US Plivo number on your account: 10 digits.</p>
                 </div>
 
                 <div class="flex justify-end">
@@ -256,12 +256,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Phone Number (SMS)
                         </label>
-                        <input
-                            v-model="modal.phone"
-                            type="tel"
-                            placeholder="+15551234567"
-                            class="w-full border rounded-lg px-3 py-2"
-                        />
+                        <UsPhoneInput v-model="modal.phone" />
                     </div>
                     <p class="text-xs text-gray-500 -mt-2">
                         Fill in either one or both. Alerts go to every address you enter.
@@ -303,6 +298,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { api } from '@/services/api';
+import UsPhoneInput from '@/components/UsPhoneInput.vue';
+import { isUsPhone, toUsPhone } from '@/utils/phone';
 
 const recipients = ref([]);
 const loading = ref(true);
@@ -351,6 +348,7 @@ function showEditModal(recipient) {
         ...recipient,
         email: recipient.email ?? '',
         phone: recipient.phone ?? '',
+        original_phone: recipient.phone ?? null,
     };
     error.value = null;
 }
@@ -361,23 +359,34 @@ function closeModal() {
 }
 
 async function saveRecipient() {
+    const isEdit = Boolean(modal.value.id);
+    const phone = toUsPhone(modal.value.phone) || null;
     const payload = {
         name: modal.value.name?.trim() || null,
         email: modal.value.email?.trim() || null,
-        phone: modal.value.phone?.trim() || null,
         enabled: modal.value.enabled,
     };
 
-    if (!payload.email && !payload.phone) {
+    if (!payload.email && !phone) {
         error.value = 'Enter an email address, a phone number, or both.';
         return;
+    }
+
+    // An unchanged phone saved before US-only validation is left alone, so
+    // the rest of the recipient can still be edited.
+    if (!isEdit || phone !== modal.value.original_phone) {
+        if (phone && !isUsPhone(phone)) {
+            error.value = 'Enter a valid 10-digit US phone number.';
+            return;
+        }
+        payload.phone = phone;
     }
 
     saving.value = true;
     error.value = null;
 
     try {
-        if (modal.value.id) {
+        if (isEdit) {
             await api.updateRecipient(modal.value.id, payload);
         } else {
             await api.createRecipient(payload);
@@ -485,6 +494,7 @@ function loadDeliveryForms(data) {
         plivo_auth_token_set: data.plivo_auth_token_set,
         clear_plivo_auth_token: false,
         plivo_from_number: data.plivo_from_number ?? '',
+        original_from_number: data.plivo_from_number ?? null,
     };
 }
 
@@ -541,14 +551,26 @@ async function saveSmtp() {
 }
 
 async function savePlivo() {
-    delivery.value.savingPlivo = true;
     delivery.value.plivoMessage = null;
 
     const payload = {
         plivo_auth_id: blankToNull(plivo.value.plivo_auth_id),
-        plivo_from_number: blankToNull(plivo.value.plivo_from_number),
         clear_plivo_auth_token: plivo.value.clear_plivo_auth_token,
     };
+
+    // Only send the From Number when it changed, so one saved in an older
+    // format (or set in .env) doesn't block saving the credentials.
+    const fromNumber = toUsPhone(plivo.value.plivo_from_number) || null;
+    if (fromNumber !== (plivo.value.original_from_number || null)) {
+        if (fromNumber && !isUsPhone(fromNumber)) {
+            delivery.value.plivoOk = false;
+            delivery.value.plivoMessage = 'Enter a valid 10-digit US From Number.';
+            return;
+        }
+        payload.plivo_from_number = fromNumber;
+    }
+
+    delivery.value.savingPlivo = true;
     if (plivo.value.plivo_auth_token && !plivo.value.clear_plivo_auth_token) {
         payload.plivo_auth_token = plivo.value.plivo_auth_token;
     }

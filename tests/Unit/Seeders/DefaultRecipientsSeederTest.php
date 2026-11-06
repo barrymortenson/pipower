@@ -87,3 +87,33 @@ it('handles bare values without names', function () {
     expect($phone->name)->toBeNull();
     expect($phone->email)->toBeNull();
 });
+
+it('stores formatted US phone numbers as +1 and 10 digits', function () {
+    config(['pipower.defaults.recipients' => 'Cell <(805) 205-3000>, Office <1-805-555-1234>']);
+
+    (new DefaultRecipientsSeeder)->run();
+
+    expect(Recipient::orderBy('id')->pluck('phone')->all())->toBe(['+18052053000', '+18055551234']);
+});
+
+it('skips phone numbers that are not valid US numbers', function () {
+    config(['pipower.defaults.recipients' => 'Mom <mom@example.com>, Mom <+44 7911 123456>, Bad <555-1234>, Cell <+18052053000>']);
+
+    (new DefaultRecipientsSeeder)->run();
+
+    $recipients = Recipient::orderBy('id')->get(['name', 'email', 'phone']);
+
+    expect($recipients->map(fn ($r) => [$r->name, $r->email, $r->phone])->all())->toBe([
+        ['Mom', 'mom@example.com', null],
+        ['Cell', null, '+18052053000'],
+    ]);
+});
+
+it('does not duplicate a formatted phone number on re-run', function () {
+    config(['pipower.defaults.recipients' => 'Cell <(805) 205-3000>']);
+
+    (new DefaultRecipientsSeeder)->run();
+    (new DefaultRecipientsSeeder)->run();
+
+    expect(Recipient::count())->toBe(1);
+});
