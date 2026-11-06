@@ -119,6 +119,15 @@ pa power:status        # Check UPS status
 pa power:health        # Health check (NUT daemon + UPS connectivity)
 pa power:notify-test   # Test notifications
 pa power:deploy        # Configure hostname, network, and update
+pa power:update        # Check for and apply updates
+```
+
+The `pa` alias runs artisan in the installed app (`/var/www/pipower`). Running `php artisan` inside the `~/PiPower` source checkout fails because its dependencies are only installed in `/var/www/pipower`.
+
+To update manually over SSH, run the update script from the source checkout:
+
+```bash
+cd ~/PiPower && sudo ./update.sh
 ```
 
 During development, use `php artisan` directly.

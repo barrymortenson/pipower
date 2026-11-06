@@ -3,10 +3,19 @@
 # PiPower Update Script
 # Pulls latest code and applies updates
 #
+# Usage: sudo ./update.sh   (from the PiPower git checkout)
+#
+
+# Re-run under bash if started with sh (e.g. "sh update.sh")
+if [ -z "$BASH_VERSION" ]; then
+    exec /bin/bash "$0" "$@"
+fi
+
 set -e
 
 INSTALL_DIR="/var/www/pipower"
-REPO_DIR="/home/pi/pipower"
+# The git checkout this script lives in (e.g. /home/pi/PiPower)
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK_FILE="/tmp/pipower-updating.lock"
 
 # Always remove lock file on exit (success or failure)
@@ -48,6 +57,13 @@ rsync -a --delete \
 
 # Set ownership
 chown -R www-data:www-data "$INSTALL_DIR"
+
+# Record where the source checkout lives so the web UI can find it
+if grep -q "^PIPOWER_REPO_DIR=" "$INSTALL_DIR/.env"; then
+    sed -i "s|^PIPOWER_REPO_DIR=.*|PIPOWER_REPO_DIR=$REPO_DIR|" "$INSTALL_DIR/.env"
+else
+    echo "PIPOWER_REPO_DIR=$REPO_DIR" >> "$INSTALL_DIR/.env"
+fi
 
 # Install/update PHP dependencies
 echo "Updating PHP dependencies..."

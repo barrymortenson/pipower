@@ -20,8 +20,6 @@ class DeployCommand extends Command
 
     private const CMDLINE_PATH = '/boot/firmware/cmdline.txt';
 
-    private const UPDATE_SCRIPT = '/home/pi/pipower/update.sh';
-
     public function handle(SystemConfigService $systemConfig): int
     {
         info('');
@@ -198,7 +196,9 @@ class DeployCommand extends Command
 
     private function runUpdate(): ?string
     {
-        if (! file_exists(self::UPDATE_SCRIPT)) {
+        $updateScript = config('pipower.repo_dir').'/update.sh';
+
+        if (! file_exists($updateScript)) {
             return null;
         }
 
@@ -208,7 +208,7 @@ class DeployCommand extends Command
         $result = Process::path('/tmp')
             ->timeout(600)
             ->tty()
-            ->run('sudo '.self::UPDATE_SCRIPT);
+            ->run('sudo '.escapeshellarg($updateScript));
 
         info('');
 

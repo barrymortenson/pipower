@@ -16,10 +16,6 @@ class UpdateCommand extends Command
 
     protected $description = 'Check for and apply PiPower updates';
 
-    private const UPDATE_SCRIPT = '/home/pi/pipower/update.sh';
-
-    private const REPO_DIR = '/home/pi/pipower';
-
     public function handle(): int
     {
         info('');
@@ -67,7 +63,7 @@ class UpdateCommand extends Command
         $result = Process::path('/tmp')
             ->timeout(600)
             ->tty()
-            ->run('sudo '.self::UPDATE_SCRIPT);
+            ->run('sudo '.escapeshellarg($this->repoDir().'/update.sh'));
 
         info('');
 
@@ -87,7 +83,7 @@ class UpdateCommand extends Command
 
     private function getCurrentVersion(): string
     {
-        $result = Process::path(self::REPO_DIR)
+        $result = Process::path($this->repoDir())
             ->run('sudo -u pi git describe --tags --always 2>/dev/null || sudo -u pi git rev-parse --short HEAD');
 
         return trim($result->output()) ?: 'unknown';
@@ -96,10 +92,10 @@ class UpdateCommand extends Command
     private function checkForUpdates(): array
     {
         // Fetch latest from remote
-        Process::path(self::REPO_DIR)->run('sudo -u pi git fetch origin 2>/dev/null');
+        Process::path($this->repoDir())->run('sudo -u pi git fetch origin 2>/dev/null');
 
         // Check commits behind
-        $result = Process::path(self::REPO_DIR)
+        $result = Process::path($this->repoDir())
             ->run('sudo -u pi git rev-list HEAD..origin/main --count 2>/dev/null');
 
         $commitsBehind = (int) trim($result->output());
@@ -108,5 +104,10 @@ class UpdateCommand extends Command
             'available' => $commitsBehind > 0,
             'commits' => $commitsBehind,
         ];
+    }
+
+    private function repoDir(): string
+    {
+        return config('pipower.repo_dir');
     }
 }

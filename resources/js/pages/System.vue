@@ -281,6 +281,10 @@
                     <p class="text-sm">{{ updateInfo.commits_behind }} commit(s) behind latest version.</p>
                 </div>
 
+                <div v-else-if="updateInfo.error && !checkingUpdates" class="p-3 bg-red-50 text-red-700 rounded">
+                    Can't check for updates: {{ updateInfo.error }}
+                </div>
+
                 <div v-else-if="updateInfo.current_version && !checkingUpdates" class="p-3 bg-green-50 text-green-700 rounded">
                     You're running the latest version.
                 </div>
