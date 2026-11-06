@@ -112,6 +112,13 @@ if [ -f /boot/firmware/pipower.env ]; then
     echo "Notification settings applied and removed from boot partition."
 fi
 
+# Record where the source checkout lives (used by the in-app updater)
+if grep -q "^PIPOWER_REPO_DIR=" "$INSTALL_DIR/.env"; then
+    sed -i "s|^PIPOWER_REPO_DIR=.*|PIPOWER_REPO_DIR=$SCRIPT_DIR|" "$INSTALL_DIR/.env"
+else
+    echo "PIPOWER_REPO_DIR=$SCRIPT_DIR" >> "$INSTALL_DIR/.env"
+fi
+
 # Ensure APP_KEY is set
 if ! grep -q "^APP_KEY=base64:" "$INSTALL_DIR/.env"; then
     sudo -u www-data php "$INSTALL_DIR/artisan" key:generate
@@ -214,15 +221,15 @@ echo "Configuring update permissions..."
 # Allow www-data to traverse /home/pi
 chmod o+x /home/pi
 # Allow www-data to read the source repo for update checks
-chmod -R o+rX /home/pi/PiPower
+chmod -R o+rX "$SCRIPT_DIR"
 # Allow www-data to write git config
 chown www-data:www-data /var/www
 # Add safe.directory for www-data to read pi's git repo
-sudo -u www-data git config --global --add safe.directory /home/pi/PiPower
+sudo -u www-data git config --global --add safe.directory "$SCRIPT_DIR"
 # Allow www-data to run update.sh, git fetch, and system commands via sudo without password
-cat > /etc/sudoers.d/pipower << 'SUDOERS'
+cat > /etc/sudoers.d/pipower << SUDOERS
 Defaults:www-data env_keep += "XDG_RUNTIME_DIR"
-www-data ALL=(ALL) NOPASSWD: /home/pi/PiPower/update.sh
+www-data ALL=(ALL) NOPASSWD: $SCRIPT_DIR/update.sh
 www-data ALL=(pi) NOPASSWD: /usr/bin/git
 www-data ALL=(ALL) NOPASSWD: /sbin/reboot
 www-data ALL=(ALL) NOPASSWD: /sbin/shutdown

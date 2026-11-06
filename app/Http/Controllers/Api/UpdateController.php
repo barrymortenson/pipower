@@ -10,7 +10,7 @@ class UpdateController extends Controller
 {
     public function check(): JsonResponse
     {
-        $repoDir = '/home/pi/pipower';
+        $repoDir = config('pipower.repo_dir');
 
         // Check if repo exists
         if (! is_dir($repoDir.'/.git')) {
@@ -58,7 +58,7 @@ class UpdateController extends Controller
 
     public function apply(): JsonResponse
     {
-        $scriptPath = '/home/pi/pipower/update.sh';
+        $scriptPath = config('pipower.repo_dir').'/update.sh';
 
         if (! file_exists($scriptPath)) {
             return response()->json([
@@ -68,7 +68,7 @@ class UpdateController extends Controller
         }
 
         // Run update script in background (it restarts PHP-FPM which would kill this request)
-        Process::path('/tmp')->run("nohup sudo {$scriptPath} > /tmp/pipower-update.log 2>&1 &");
+        Process::path('/tmp')->run('nohup sudo '.escapeshellarg($scriptPath).' > /tmp/pipower-update.log 2>&1 &');
 
         return response()->json([
             'success' => true,

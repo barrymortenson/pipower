@@ -10,6 +10,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Source Repository
+    |--------------------------------------------------------------------------
+    |
+    | The git checkout on the Pi that install.sh was run from and update.sh
+    | pulls into. install.sh and update.sh record the real path in .env.
+    |
+    */
+    'repo_dir' => env('PIPOWER_REPO_DIR', '/home/pi/PiPower'),
+
+    /*
+    |--------------------------------------------------------------------------
     | NUT Configuration
     |--------------------------------------------------------------------------
     */
