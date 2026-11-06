@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\NotificationSettingsController;
 use App\Http\Controllers\Api\PiConnectController;
 use App\Http\Controllers\Api\RecipientsController;
 use App\Http\Controllers\Api\SettingsController;
@@ -21,6 +22,9 @@ Route::middleware('api.token')->group(function () {
 
         return response()->json($service->sendTestNotification());
     });
+
+    Route::get('/settings/notifications', [NotificationSettingsController::class, 'show']);
+    Route::put('/settings/notifications', [NotificationSettingsController::class, 'update']);
 
     Route::get('/settings', [SettingsController::class, 'index']);
     Route::put('/settings', [SettingsController::class, 'update']);

@@ -200,7 +200,7 @@ Common USB UPS setup:
 
 ### Notification Settings
 
-Configure notifications via the web UI or directly in `.env`:
+Configure notifications on the web UI's Notifications page or directly in `.env`. Values saved in the UI take precedence over `.env`; the SMTP password and Plivo auth token are encrypted in the database and never shown again after saving.
 
 ```env
 # Email (SMTP)
