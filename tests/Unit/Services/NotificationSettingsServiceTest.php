@@ -54,6 +54,22 @@ it('only overrides the smtp keys that were saved', function () {
         ->and(config('mail.from.name'))->toBe('UI Name');
 });
 
+it('never sends the .env password to a different server saved in the UI', function () {
+    config([
+        'pipower.smtp.host' => 'smtp.env.test',
+        'mail.mailers.smtp.host' => 'smtp.env.test',
+        'mail.mailers.smtp.password' => 'env-password',
+    ]);
+
+    // Simulate a host row with no password row (e.g. written outside update())
+    Setting::set('smtp_host', 'attacker.test');
+
+    (new NotificationSettingsService)->applyMailConfig();
+
+    expect(config('mail.mailers.smtp.host'))->toBe('attacker.test')
+        ->and(config('mail.mailers.smtp.password'))->toBeNull();
+});
+
 it('treats an undecryptable secret as not set', function () {
     Setting::set('plivo_auth_token', 'not-valid-ciphertext');
 

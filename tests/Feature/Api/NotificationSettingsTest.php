@@ -94,11 +94,40 @@ it('encrypts secrets at rest', function () {
         ->and(decrypt(Setting::get('smtp_password'), false))->toBe('ui-password');
 });
 
-it('keeps the saved password when none is sent', function () {
+it('keeps the saved password when none is sent and the server is unchanged', function () {
     $this->putJson('/api/settings/notifications', ['smtp_password' => 'ui-password'])->assertOk();
-    $this->putJson('/api/settings/notifications', ['smtp_host' => 'other.test', 'smtp_password' => null])->assertOk();
+    $this->putJson('/api/settings/notifications', [
+        'smtp_host' => 'SMTP.env.test',
+        'smtp_from_name' => 'New Name',
+        'smtp_password' => null,
+    ])->assertOk();
 
     expect(decrypt(Setting::get('smtp_password'), false))->toBe('ui-password');
+});
+
+it('drops the saved password when the server changes without a new password', function () {
+    $this->putJson('/api/settings/notifications', ['smtp_password' => 'ui-password'])->assertOk();
+
+    $this->putJson('/api/settings/notifications', ['smtp_host' => 'attacker.test'])
+        ->assertOk()
+        ->assertJson(['smtp_host' => 'attacker.test', 'smtp_password_set' => false]);
+});
+
+it('drops the .env password when the server changes without a new password', function () {
+    $this->putJson('/api/settings/notifications', ['smtp_host' => 'attacker.test'])
+        ->assertOk()
+        ->assertJson(['smtp_password_set' => false]);
+});
+
+it('keeps a new password sent together with a server change', function () {
+    $this->putJson('/api/settings/notifications', [
+        'smtp_host' => 'smtp.new.test',
+        'smtp_password' => 'new-password',
+    ])
+        ->assertOk()
+        ->assertJson(['smtp_password_set' => true]);
+
+    expect(decrypt(Setting::get('smtp_password'), false))->toBe('new-password');
 });
 
 it('clears the saved password and token on request', function () {

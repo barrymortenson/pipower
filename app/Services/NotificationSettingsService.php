@@ -57,9 +57,20 @@ class NotificationSettingsService
      *
      * Secret fields are only changed when a new value is given, or when
      * clear_smtp_password / clear_plivo_auth_token is true.
+     *
+     * Changing the SMTP server without entering a password in the same
+     * request clears the saved password. Otherwise anyone who can reach the
+     * API could point the host at their own server and capture the existing
+     * password on the next send.
      */
     public function update(array $data): void
     {
+        if (array_key_exists('smtp_host', $data)
+            && ! $this->sameHost($data['smtp_host'], $this->effective()['smtp_host'])
+            && blank($data['smtp_password'] ?? null)) {
+            $data['clear_smtp_password'] = true;
+        }
+
         foreach (array_keys(self::FIELDS) as $key) {
             if (in_array($key, self::SECRETS, true)) {
                 if (! empty($data["clear_{$key}"])) {
@@ -123,6 +134,13 @@ class NotificationSettingsService
             return;
         }
 
+        // Never send the .env password to a server other than the .env host.
+        if (array_key_exists('smtp_host', $stored)
+            && ! array_key_exists('smtp_password', $stored)
+            && ! $this->sameHost($stored['smtp_host'], config('pipower.smtp.host'))) {
+            $overrides['mail.mailers.smtp.password'] = null;
+        }
+
         // An SMTP server entered in the UI means "send over SMTP", even if
         // .env selects another mailer (e.g. log).
         if (filled($stored['smtp_host'] ?? null)) {
@@ -171,6 +189,11 @@ class NotificationSettingsService
         }
 
         return $stored;
+    }
+
+    private function sameHost(mixed $a, mixed $b): bool
+    {
+        return strcasecmp(trim((string) $a), trim((string) $b)) === 0;
     }
 
     private function decrypt(string $key, string $value): ?string

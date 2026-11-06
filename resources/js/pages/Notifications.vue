@@ -90,6 +90,9 @@
                     </div>
                 </div>
                 <p class="text-xs text-gray-500 -mt-2">Use port 587 for STARTTLS or 465 for SSL/TLS.</p>
+                <p v-if="smtpHostChangedWithoutPassword" class="p-2 text-xs bg-yellow-50 text-yellow-800 rounded">
+                    Changing the server removes the saved password. Enter the password for the new server before saving.
+                </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -439,6 +442,7 @@ const delivery = ref({
 function loadDeliveryForms(data) {
     smtp.value = {
         smtp_host: data.smtp_host ?? '',
+        original_host: data.smtp_host ?? '',
         smtp_port: data.smtp_port ?? null,
         smtp_username: data.smtp_username ?? '',
         smtp_password: '',
@@ -466,6 +470,12 @@ async function fetchDeliverySettings() {
         delivery.value.loading = false;
     }
 }
+
+const smtpHostChangedWithoutPassword = computed(() =>
+    smtp.value.smtp_password_set
+    && !smtp.value.smtp_password
+    && (smtp.value.smtp_host || '').trim().toLowerCase() !== (smtp.value.original_host || '').trim().toLowerCase()
+);
 
 function blankToNull(value) {
     return value === '' || value === undefined ? null : value;
