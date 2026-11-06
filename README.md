@@ -222,7 +222,7 @@ MAIL_FROM_ADDRESS=pipower@example.com
 # SMS (Plivo)
 PLIVO_AUTH_ID=your-auth-id
 PLIVO_AUTH_TOKEN=your-auth-token
-PLIVO_FROM_NUMBER=+1234567890
+PLIVO_FROM_NUMBER=+18055551234
 ```
 
 ## Architecture

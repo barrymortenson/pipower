@@ -117,6 +117,28 @@ it('removes one channel from a recipient that has both', function () {
         ->and($recipient->fresh()->phone)->toBe('+15551234567');
 });
 
+it('clears the phone from a recipient that has both', function () {
+    $recipient = Recipient::create(['email' => 'barry@example.com', 'phone' => '+15551234567', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['phone' => null])
+        ->assertStatus(200);
+
+    expect($recipient->fresh()->phone)->toBeNull()
+        ->and($recipient->fresh()->email)->toBe('barry@example.com');
+});
+
+it('updates a recipient whose phone was saved in an older format without changing it', function () {
+    $recipient = Recipient::create(['name' => 'Mom', 'phone' => '+44 7911 123456', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['name' => 'Mum', 'enabled' => false])
+        ->assertStatus(200);
+
+    expect($recipient->fresh())
+        ->name->toBe('Mum')
+        ->enabled->toBeFalse()
+        ->phone->toBe('+44 7911 123456');
+});
+
 it('refuses an update that leaves a recipient with no email or phone', function () {
     $recipient = Recipient::create(['email' => 'barry@example.com', 'enabled' => true]);
 

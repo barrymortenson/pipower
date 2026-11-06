@@ -23,6 +23,9 @@ it('rejects numbers that are not +1 and 10 digits', function (string $value) {
     'parentheses' => '+1(805)2053000',
     'other country code' => '+448052053000',
     'letters' => 'abc',
+    'trailing newline' => "+18052053000\n",
+    'area code starting with 0' => '+10052053000',
+    'area code starting with 1' => '+11805205300',
 ]);
 
 it('normalizes loosely formatted US numbers', function (string $value) {
@@ -37,4 +40,11 @@ it('normalizes loosely formatted US numbers', function (string $value) {
 
 it('returns null for numbers that are not 10-digit US numbers', function (string $value) {
     expect(UsPhoneNumber::normalize($value))->toBeNull();
-})->with(['805205300', '+448052053000', '28052053000', 'abc']);
+})->with([
+    'nine digits' => '805205300',
+    'UK number' => '+448052053000',
+    'Singapore number with 10 digits in total' => '+65 9123 4567',
+    'eleven digits not starting with 1' => '28052053000',
+    'country code 1 with a digit missing' => '1-805-205-300',
+    'letters' => 'abc',
+]);
