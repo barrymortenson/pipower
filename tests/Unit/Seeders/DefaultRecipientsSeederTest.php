@@ -87,3 +87,11 @@ it('handles bare values without names', function () {
     expect($phone->name)->toBeNull();
     expect($phone->email)->toBeNull();
 });
+
+it('stores formatted US phone numbers as +1 and 10 digits', function () {
+    config(['pipower.defaults.recipients' => 'Cell <(805) 205-3000>, Office <1-805-555-1234>']);
+
+    (new DefaultRecipientsSeeder)->run();
+
+    expect(Recipient::orderBy('id')->pluck('phone')->all())->toBe(['+18052053000', '+18055551234']);
+});

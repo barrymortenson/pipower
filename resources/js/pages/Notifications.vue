@@ -175,8 +175,8 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">From Number</label>
-                    <input v-model="plivo.plivo_from_number" type="tel" placeholder="+15551234567" class="w-full border rounded-lg px-3 py-2" />
-                    <p class="text-xs text-gray-500 mt-1">A Plivo number on your account, in international format.</p>
+                    <UsPhoneInput v-model="plivo.plivo_from_number" />
+                    <p class="text-xs text-gray-500 mt-1">A Plivo number on your account: 10 digits, no spaces or symbols.</p>
                 </div>
 
                 <div class="flex justify-end">
@@ -256,12 +256,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Phone Number (SMS)
                         </label>
-                        <input
-                            v-model="modal.phone"
-                            type="tel"
-                            placeholder="+15551234567"
-                            class="w-full border rounded-lg px-3 py-2"
-                        />
+                        <UsPhoneInput v-model="modal.phone" />
                     </div>
                     <p class="text-xs text-gray-500 -mt-2">
                         Fill in either one or both. Alerts go to every address you enter.
@@ -303,6 +298,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { api } from '@/services/api';
+import UsPhoneInput from '@/components/UsPhoneInput.vue';
+import { isUsPhone } from '@/utils/phone';
 
 const recipients = ref([]);
 const loading = ref(true);
@@ -370,6 +367,11 @@ async function saveRecipient() {
 
     if (!payload.email && !payload.phone) {
         error.value = 'Enter an email address, a phone number, or both.';
+        return;
+    }
+
+    if (payload.phone && !isUsPhone(payload.phone)) {
+        error.value = 'Enter a 10-digit phone number.';
         return;
     }
 
@@ -541,8 +543,15 @@ async function saveSmtp() {
 }
 
 async function savePlivo() {
-    delivery.value.savingPlivo = true;
     delivery.value.plivoMessage = null;
+
+    if (plivo.value.plivo_from_number && !isUsPhone(plivo.value.plivo_from_number)) {
+        delivery.value.plivoOk = false;
+        delivery.value.plivoMessage = 'Enter a 10-digit From Number.';
+        return;
+    }
+
+    delivery.value.savingPlivo = true;
 
     const payload = {
         plivo_auth_id: blankToNull(plivo.value.plivo_auth_id),

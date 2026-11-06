@@ -69,6 +69,24 @@ it('rejects an invalid email address', function () {
         ->assertJsonValidationErrors('email');
 });
 
+it('rejects a phone number that is not +1 and 10 digits', function (string $phone) {
+    $this->postJson('/api/recipients', ['phone' => $phone])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('phone');
+
+    expect(Recipient::count())->toBe(0);
+})->with(['8052053000', '+1805205300', '+1 805 205 3000', '+1805-205-3000', '+448052053000']);
+
+it('rejects an update to an invalid phone number', function () {
+    $recipient = Recipient::create(['phone' => '+15551234567', 'enabled' => true]);
+
+    $this->putJson("/api/recipients/{$recipient->id}", ['phone' => '555-123-4567'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('phone');
+
+    expect($recipient->fresh()->phone)->toBe('+15551234567');
+});
+
 it('updates a recipient', function () {
     $recipient = Recipient::create(['email' => 'old@example.com', 'enabled' => true]);
 

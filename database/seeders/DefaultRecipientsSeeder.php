@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Recipient;
+use App\Rules\UsPhoneNumber;
 use Illuminate\Database\Seeder;
 
 class DefaultRecipientsSeeder extends Seeder
@@ -103,6 +104,11 @@ class DefaultRecipientsSeeder extends Seeder
             }
 
             $type = str_contains($value, '@') ? 'email' : 'phone';
+
+            if ($type === 'phone') {
+                // Store US numbers as +1XXXXXXXXXX; keep anything else as written.
+                $value = UsPhoneNumber::normalize($value) ?? $value;
+            }
 
             $contacts[] = [
                 'name' => $name,
