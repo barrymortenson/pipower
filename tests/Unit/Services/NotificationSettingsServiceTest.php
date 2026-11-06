@@ -91,7 +91,7 @@ it('sends sms with plivo credentials saved in the UI over .env values', function
         'plivo_from_number' => '+15559999999',
     ]);
 
-    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+    Recipient::create(['phone' => '+15551234567', 'enabled' => true]);
 
     (new NotificationService)->sendSmsNotifications('host', 'Subject', 'Message');
 

@@ -7,6 +7,7 @@ use App\Models\Recipient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 
 class RecipientsController extends Controller
 {
@@ -19,12 +20,14 @@ class RecipientsController extends Controller
     {
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
-            'type' => 'required|in:email,phone',
-            'value' => 'required|string',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:32',
             'enabled' => 'boolean',
         ]);
 
-        $recipient = Recipient::create($validated);
+        $recipient = new Recipient($validated);
+        $this->ensureHasContact($recipient);
+        $recipient->save();
 
         return response()->json($recipient, 201);
     }
@@ -33,12 +36,14 @@ class RecipientsController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|nullable|string|max:255',
-            'type' => 'sometimes|in:email,phone',
-            'value' => 'sometimes|string',
+            'email' => 'sometimes|nullable|email|max:255',
+            'phone' => 'sometimes|nullable|string|max:32',
             'enabled' => 'sometimes|boolean',
         ]);
 
-        $recipient->update($validated);
+        $recipient->fill($validated);
+        $this->ensureHasContact($recipient);
+        $recipient->save();
 
         return response()->json($recipient);
     }
@@ -48,5 +53,17 @@ class RecipientsController extends Controller
         $recipient->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Email and phone are each optional, but a recipient needs at least one.
+     */
+    private function ensureHasContact(Recipient $recipient): void
+    {
+        if (blank($recipient->email) && blank($recipient->phone)) {
+            throw ValidationException::withMessages([
+                'email' => 'Enter an email address, a phone number, or both.',
+            ]);
+        }
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('sends test and shows results', function () {
-    Recipient::create(['type' => 'email', 'value' => 'test@example.com', 'enabled' => true]);
+    Recipient::create(['email' => 'test@example.com', 'enabled' => true]);
 
     $this->mock(NotificationService::class, function ($mock) {
         $mock->shouldReceive('sendTestNotification')->once()->andReturn([
@@ -37,8 +37,8 @@ it('shows error when no recipients', function () {
 });
 
 it('handles both email and sms results', function () {
-    Recipient::create(['type' => 'email', 'value' => 'test@example.com', 'enabled' => true]);
-    Recipient::create(['type' => 'phone', 'value' => '+15551234567', 'enabled' => true]);
+    Recipient::create(['email' => 'test@example.com', 'enabled' => true]);
+    Recipient::create(['phone' => '+15551234567', 'enabled' => true]);
 
     $this->mock(NotificationService::class, function ($mock) {
         $mock->shouldReceive('sendTestNotification')->once()->andReturn([
@@ -57,7 +57,7 @@ it('handles both email and sms results', function () {
 });
 
 it('shows failure status for failed notifications', function () {
-    Recipient::create(['type' => 'email', 'value' => 'bad@example.com', 'enabled' => true]);
+    Recipient::create(['email' => 'bad@example.com', 'enabled' => true]);
 
     $this->mock(NotificationService::class, function ($mock) {
         $mock->shouldReceive('sendTestNotification')->once()->andReturn([

@@ -11,7 +11,9 @@ class DefaultRecipientsSeeder extends Seeder
      * Seed default notification recipients from .env configuration.
      *
      * Format: "Name <value>, Name <value>"
-     * Type is auto-detected: @ = email, + = phone
+     * Type is auto-detected: @ = email, anything else = phone.
+     * Entries that share a name become one recipient with both an email
+     * address and a phone number, e.g. "Barry <b@example.com>, Barry <+15551234567>".
      */
     public function run(): void
     {
@@ -21,12 +23,58 @@ class DefaultRecipientsSeeder extends Seeder
             return;
         }
 
-        foreach ($this->parse($raw) as $contact) {
-            Recipient::firstOrCreate(
-                ['type' => $contact['type'], 'value' => $contact['value']],
-                ['name' => $contact['name'], 'enabled' => true]
-            );
+        foreach ($this->group($this->parse($raw)) as $contact) {
+            $exists = Recipient::query()
+                ->where(function ($query) use ($contact) {
+                    if ($contact['email'] !== null) {
+                        $query->orWhere('email', $contact['email']);
+                    }
+                    if ($contact['phone'] !== null) {
+                        $query->orWhere('phone', $contact['phone']);
+                    }
+                })
+                ->exists();
+
+            if (! $exists) {
+                Recipient::create([...$contact, 'enabled' => true]);
+            }
         }
+    }
+
+    /**
+     * Combine parsed entries into recipients. A named entry merges into an
+     * earlier one with the same name when that one has no value of its type
+     * yet. Unnamed entries always stand alone.
+     *
+     * @param  array<int, array{name: ?string, type: string, value: string}>  $contacts
+     * @return array<int, array{name: ?string, email: ?string, phone: ?string}>
+     */
+    private function group(array $contacts): array
+    {
+        $recipients = [];
+
+        foreach ($contacts as $contact) {
+            $field = $contact['type'];
+            $match = null;
+
+            if ($contact['name'] !== null) {
+                foreach ($recipients as $index => $recipient) {
+                    if ($recipient['name'] === $contact['name'] && $recipient[$field] === null) {
+                        $match = $index;
+                        break;
+                    }
+                }
+            }
+
+            if ($match === null) {
+                $recipients[] = ['name' => $contact['name'], 'email' => null, 'phone' => null];
+                $match = array_key_last($recipients);
+            }
+
+            $recipients[$match][$field] = $contact['value'];
+        }
+
+        return $recipients;
     }
 
     /**

@@ -9,8 +9,8 @@ class Recipient extends Model
 {
     protected $fillable = [
         'name',
-        'type',
-        'value',
+        'email',
+        'phone',
         'enabled',
     ];
 
@@ -25,11 +25,11 @@ class Recipient extends Model
 
     public function scopeEmails(Builder $query): Builder
     {
-        return $query->where('type', 'email');
+        return $query->whereNotNull('email')->where('email', '!=', '');
     }
 
     public function scopePhones(Builder $query): Builder
     {
-        return $query->where('type', 'phone');
+        return $query->whereNotNull('phone')->where('phone', '!=', '');
     }
 }
